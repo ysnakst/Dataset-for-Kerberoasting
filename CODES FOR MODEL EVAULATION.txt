@@ -1,0 +1,121 @@
+### CODES FOR MODEL EVAULATION ###
+
+import pandas as pd
+from sklearn.model_selection import StratifiedKFold, GridSearchCV
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+import xgboost as xgb
+import lightgbm as lgb
+from sklearn.naive_bayes import GaussianNB, BernoulliNB
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, fbeta_score, accuracy_score
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+import numpy as np
+
+
+# Load the dataset
+input_file = r"C:\Users\lenovo\Desktop\Dataset.csv"
+df = pd.read_csv(input_file, delimiter=';')
+
+
+# Replace commas with dots
+df = df.replace(',', '.', regex=True)
+
+
+# Split the features and target column
+X = df.drop(columns=['issuspicous'])
+y = df['issuspicous']
+
+
+# Standardize the data
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+
+# Define models and their hyperparameter grids
+models = {
+    'SVC': (SVC(), {'C': [0.1, 1, 10], 'kernel': ['linear', 'rbf']}),
+    "GaussianNB": (GaussianNB(), {}),
+    "BernoulliNB": (BernoulliNB(), {'alpha': [0.5, 1.0, 2.0]}),
+    'RandomForest': (RandomForestClassifier(), {'n_estimators': [50, 100], 'max_depth': [10, 20]}),
+    'KNN': (KNeighborsClassifier(), {'n_neighbors': [3, 5, 7]}),
+    'LogisticRegression': (LogisticRegression(), {'C': [0.1, 1, 10]}),
+    'DecisionTree': (DecisionTreeClassifier(), {'max_depth': [5, 10, 15]}),
+    'XGBoost': (xgb.XGBClassifier(), {'learning_rate': [0.01, 0.1], 'max_depth': [3, 5]}),
+    'LightGBM': (lgb.LGBMClassifier(), {'learning_rate': [0.01, 0.1], 'max_depth': [3, 5]}),
+}
+
+
+# Stratified K-Fold Cross Validation setup
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+
+# Dictionary to store the best models and their hyperparameters
+best_params = {}
+
+
+# GridSearch for each model
+for model_name, (model, params) in models.items():
+    grid_search = GridSearchCV(model, params, cv=skf, scoring='f1')
+
+grid_search.fit(X_scaled, y)
+    best_params[model_name] = grid_search.best_params_
+
+
+# Function to calculate performance metrics
+def calculate_metrics(y_true, y_pred):
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    f2 = fbeta_score(y_true, y_pred, beta=2)
+    accuracy = accuracy_score(y_true, y_pred)
+    return tn, fp, fn, tp, precision, recall, f1, f2, accuracy
+
+
+# Dictionary to store metrics for all models
+metrics = {}
+
+
+for model_name, (model, params) in models.items():
+    model_best = model.set_params(**best_params[model_name])
+    cv_metrics = []
+   
+    for train_index, test_index in skf.split(X_scaled, y):
+        X_train, X_test = X_scaled[train_index], X_scaled[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+        model_best.fit(X_train, y_train)
+        y_pred = model_best.predict(X_test)
+        cv_metrics.append(calculate_metrics(y_test, y_pred))
+   
+    # Average over the cross-validation folds
+    avg_metrics = np.mean(cv_metrics, axis=0)
+    metrics[model_name] = avg_metrics
+
+
+# Create a DataFrame for performance metrics
+metrics_df = pd.DataFrame(metrics, index=['TN', 'FP', 'FN', 'TP', 'Precision', 'Recall', 'F1', 'F2', 'Accuracy']).T
+
+
+# Sort the DataFrame by F2 score
+metrics_df_sorted = metrics_df.sort_values(by='F2', ascending=False)
+
+
+# Add ranking to model names
+ranked_model_names = [f"{i+1}. {name}" for i, name in enumerate(metrics_df_sorted.index)]
+metrics_df_sorted.index = ranked_model_names
+
+# Print the sorted metrics
+print(metrics_df_sorted)
+
+
+# Plot the metrics as a heatmap
+plt.figure(figsize=(12, 8))
+sns.heatmap(metrics_df_sorted[['Precision', 'Recall', 'F1', 'F2', 'Accuracy']], annot=True, cmap='Blues')
+plt.title('Results for K-Fold Stratified Cross Validation (Average)')
+plt.show()

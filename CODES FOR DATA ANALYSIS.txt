@@ -1,0 +1,160 @@
+###Codes For Data Analysis###
+
+#Correlation Heatmap#
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+# Step 1: Read input file
+input_file = r"C:\Users\lenovo\Desktop\Dataset.csv"
+df = pd.read_csv(input_file, delimiter=';')
+
+
+# Step 2: Select only numeric columns
+numeric_df = df.select_dtypes(include=[float, int])
+
+
+# Check if numeric_df has any numeric columns
+if numeric_df.empty:
+    print("No numeric columns found in the dataset.")
+else:
+    # Step 3: Calculate correlation matrix
+    corr_matrix = numeric_df.corr()
+
+
+    if corr_matrix.empty:
+        print("Correlation matrix is empty.")
+    else:
+        # Step 4: Visualize correlation matrix with Heatmap
+        plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
+        sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", fmt='.2f', linewidths=0.5)
+        plt.title('Correlation Matrix Heatmap')
+        plt.show()
+
+#Explanatory Data Analysis#
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+# Read CSV file
+input_file = r"C:\Users\lenovo\Desktop\Dataset.csv"
+df = pd.read_csv(input_file, delimiter=';')
+
+
+# Statistical Informations
+print(df.describe())
+
+
+#Feature Importance#
+
+import pandas as pd
+
+
+# Load the dataset
+input_file = r"C:\Users\lenovo\Desktop\Dataset.csv"
+df = pd.read_csv(input_file, delimiter=';')
+
+
+# Replace commas with dots
+df = df.replace(',', '.', regex=True)
+
+
+# Display the first few rows to ensure it's loaded and formatted correctly
+print(df.head())
+
+# Analysing Missing Values
+print("\nMissing Values:")
+missing_data = df.isnull().sum()
+print(missing_data[missing_data > 0])
+
+
+# Distribution and Visualization
+plt.figure(figsize=(12, 6))
+df.hist(bins=20, figsize=(20, 15), layout=(5, 4), color='blue')
+plt.tight_layout()
+plt.show()
+
+
+# Outlier Analysis with Boxplot
+plt.figure(figsize=(10, 6))
+sns.boxplot(data=df)
+plt.show()
+
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.naive_bayes import GaussianNB, BernoulliNB
+from sklearn.preprocessing import StandardScaler
+from sklearn.inspection import permutation_importance
+import xgboost as xgb
+import lightgbm as lgb
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# Split the features and target column
+X = df.drop(columns=['issuspicous'])
+y = df['issuspicous']
+
+
+# Standardize the data
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+
+# Split the data into training and testing sets (70% train, 30% test)
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=42)
+
+
+# Initialize models including XGBoost and LightGBM
+models = {
+    'SVC': SVC(kernel='linear'),
+    'RandomForest': RandomForestClassifier(),
+    'KNN': KNeighborsClassifier(),
+    'LogisticRegression': LogisticRegression(),
+    'DecisionTree': DecisionTreeClassifier(),
+    'GaussianNB': GaussianNB(),
+    'BernoulliNB': BernoulliNB(),
+    'XGBoost': xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss'),
+    'LightGBM': lgb.LGBMClassifier()
+}
+
+
+# Dictionary to store feature importances
+feature_importances = {}
+
+# Calculate feature importance for each model
+for model_name, model in models.items():
+    model.fit(X_train, y_train)
+   
+    # If the model has feature_importances_ or coef_ attribute, use it
+    if hasattr(model, 'feature_importances_'):
+        feature_importances[model_name] = model.feature_importances_
+    elif hasattr(model, 'coef_'):
+        feature_importances[model_name] = np.abs(model.coef_).flatten()
+    else:
+        # For models without feature_importances_ or coef_, use permutation importance
+        result = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42, n_jobs=-1)
+        feature_importances[model_name] = result.importances_mean
+
+
+# Plot feature importances for each model as line charts
+plt.figure(figsize=(12, 8))
+for model_name, importance in feature_importances.items():
+    plt.plot(range(len(importance)), importance, label=model_name)
+
+
+plt.xticks(np.arange(X.shape[1]), df.columns[:-1], rotation=90)
+plt.xlabel('Features')
+plt.ylabel('Importance')
+plt.title('Feature Importance Scores by Model')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
